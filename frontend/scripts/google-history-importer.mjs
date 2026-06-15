@@ -353,26 +353,37 @@ async function loadFromGoogleDrive(date) {
     }
 
     // 4. Extract content
-    let content = ''
+    let allActivities = []
     if (file.mimeType === 'application/zip') {
       console.log(`[google-history] Extracting ZIP file in memory...`)
       const arrayBuffer = await downloadRes.arrayBuffer()
       const zip = new AdmZip(Buffer.from(arrayBuffer))
       const zipEntries = zip.getEntries()
-      // Look for My Activity.json or Aktivitas Saya.json inside the zip
-      const targetEntry = zipEntries.find((e) => 
-        e.entryName.endsWith('My Activity.json') || e.entryName.endsWith('Aktivitas Saya.json')
+      
+      // Cari SEMUA file JSON yang berkaitan dengan activity/aktivitas
+      // Kadang dipisah per folder: Takeout/Aktivitas Saya/Penelusuran/AktivitasSaya.json
+      const targetEntries = zipEntries.filter((e) => 
+        e.entryName.endsWith('.json') && 
+        (e.entryName.toLowerCase().includes('aktivitas') || e.entryName.toLowerCase().includes('activity'))
       )
-      if (!targetEntry) {
+
+      if (targetEntries.length === 0) {
         console.warn(`[google-history] No activity JSON found inside the zip ${file.name}. Ensure it contains "My Activity" data.`)
         return []
       }
-      content = targetEntry.getData().toString('utf8')
+
+      console.log(`[google-history] Found ${targetEntries.length} JSON files inside ZIP. Parsing...`)
+      for (const entry of targetEntries) {
+        const content = entry.getData().toString('utf8')
+        const parsed = parseGoogleTakeoutJson(content, date)
+        allActivities.push(...parsed)
+      }
     } else {
-      content = await downloadRes.text()
+      const content = await downloadRes.text()
+      allActivities = parseGoogleTakeoutJson(content, date)
     }
 
-    return parseGoogleTakeoutJson(content, date)
+    return allActivities
   } catch (err) {
     console.error(`[google-history] Drive error: ${messageOf(err)}`)
     return []
