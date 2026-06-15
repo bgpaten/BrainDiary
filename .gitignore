@@ -1,0 +1,60 @@
+# ════════════════════════════════════════════════════════════════
+#  BrainDiary / Personal Brain OS — .gitignore
+#  Yang dipublish HANYA SISTEMNYA. Data pribadi tiap user JANGAN
+#  di-commit (diary, entitas, hasil ekstraksi, backup, kredensial).
+# ════════════════════════════════════════════════════════════════
+
+# ── Dependency & build ───────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# ── Kredensial / environment (JANGAN commit) ────────────────────
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.local
+frontend/scripts/*.env
+!frontend/scripts/*.env.example
+
+# ── PRIVASI: isi "otak" pribadi (per-user brain content) ────────
+# Seluruh diary & entitas hasil ekstraksi. Ganti "AhyarBrainVault"
+# bila nama vault-mu berbeda. README + struktur/templat sistem
+# tetap di-track agar repo terdokumentasi.
+AhyarBrainVault/00_Diary/
+AhyarBrainVault/10_People/
+AhyarBrainVault/20_Projects/
+AhyarBrainVault/30_Places/
+AhyarBrainVault/40_Events/
+AhyarBrainVault/50_Decisions/
+AhyarBrainVault/60_Patterns/
+AhyarBrainVault/70_Goals/
+AhyarBrainVault/80_Attachments/
+AhyarBrainVault/85_Chat_Samples/
+AhyarBrainVault/90_Knowledge/
+
+# ── PRIVASI: output Brain Engine yang ter-generate ──────────────
+# Logs, reports, evaluations, identity, persona, memory, drift,
+# conflicts, runtime, final-release, dst. Hanya templates/ &
+# prompts/ (bagian sistem) yang dipertahankan.
+AhyarBrainVault/_system/*
+!AhyarBrainVault/_system/templates/
+!AhyarBrainVault/_system/prompts/
+
+# Jaga-jaga untuk vault dengan nama lain (mis. BudiBrainVault/):
+*BrainVault/_system/backups/
+*BrainVault/_system/logs/
+*BrainVault/_system/reports/
+
+# ── PRIVASI: backup & state lokal ───────────────────────────────
+backups/
+supabase/.temp/
+
+# ── Editor / OS ─────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store

@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment — JANGAN commit kredensial
+.env
+.env.*
+!.env.example
+scripts/*.env
+!scripts/*.env.example
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
