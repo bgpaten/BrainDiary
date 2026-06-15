@@ -22,6 +22,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import AdmZip from 'adm-zip'
 
 // ---------------------------------------------------------------------------
 // ENV loading
@@ -307,36 +308,70 @@ async function loadFromGoogleDrive(date) {
     const tokenData = await tokenRes.json()
     const accessToken = tokenData.access_token
 
-    // Search for file matching the date pattern
-    const fileName = `MyActivity-${date}.json`
-    const query = folderId
-      ? `name='${fileName}' and '${folderId}' in parents and trashed=false`
-      : `name='${fileName}' and trashed=false`
-    const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
+    // 1. Search for JSON file first
+    const jsonFileName = `MyActivity-${date}.json`
+    const jsonQuery = folderId
+      ? `name='${jsonFileName}' and '${folderId}' in parents and trashed=false`
+      : `name='${jsonFileName}' and trashed=false`
+    
+    let searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(jsonQuery)}&fields=files(id,name,mimeType)`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
-    if (!searchRes.ok) {
-      console.error(`[google-history] Drive search failed: ${searchRes.status}`)
-      return []
+    if (!searchRes.ok) throw new Error(`Drive JSON search failed: ${searchRes.status}`)
+    let searchData = await searchRes.json()
+    let file = searchData.files?.[0]
+
+    // 2. Fallback to Takeout ZIP file
+    if (!file) {
+      const zipQuery = folderId
+        ? `name contains 'takeout-' and mimeType='application/zip' and '${folderId}' in parents and trashed=false`
+        : `name contains 'takeout-' and mimeType='application/zip' and trashed=false`
+      searchRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(zipQuery)}&fields=files(id,name,mimeType)&orderBy=createdTime desc&pageSize=1`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
+      if (!searchRes.ok) throw new Error(`Drive ZIP search failed: ${searchRes.status}`)
+      searchData = await searchRes.json()
+      file = searchData.files?.[0]
     }
-    const searchData = await searchRes.json()
-    if (!searchData.files?.length) {
-      console.log(`[google-history] No file found in Drive for ${date}`)
+
+    if (!file) {
+      console.log(`[google-history] No file found in Drive for ${date} (looked for JSON and takeout-*.zip)`)
       return []
     }
 
-    // Download file content
-    const fileId = searchData.files[0].id
+    // 3. Download file content
+    console.log(`[google-history] Downloading from Drive: ${file.name} (type: ${file.mimeType})`)
     const downloadRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
     if (!downloadRes.ok) {
       console.error(`[google-history] Drive download failed: ${downloadRes.status}`)
       return []
     }
-    const content = await downloadRes.text()
+
+    // 4. Extract content
+    let content = ''
+    if (file.mimeType === 'application/zip') {
+      console.log(`[google-history] Extracting ZIP file in memory...`)
+      const arrayBuffer = await downloadRes.arrayBuffer()
+      const zip = new AdmZip(Buffer.from(arrayBuffer))
+      const zipEntries = zip.getEntries()
+      // Look for My Activity.json or Aktivitas Saya.json inside the zip
+      const targetEntry = zipEntries.find((e) => 
+        e.entryName.endsWith('My Activity.json') || e.entryName.endsWith('Aktivitas Saya.json')
+      )
+      if (!targetEntry) {
+        console.warn(`[google-history] No activity JSON found inside the zip ${file.name}. Ensure it contains "My Activity" data.`)
+        return []
+      }
+      content = targetEntry.getData().toString('utf8')
+    } else {
+      content = await downloadRes.text()
+    }
+
     return parseGoogleTakeoutJson(content, date)
   } catch (err) {
     console.error(`[google-history] Drive error: ${messageOf(err)}`)
