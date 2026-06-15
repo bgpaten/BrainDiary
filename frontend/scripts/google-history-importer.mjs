@@ -325,15 +325,18 @@ async function loadFromGoogleDrive(date) {
     // 2. Fallback to Takeout ZIP file
     if (!file) {
       const zipQuery = folderId
-        ? `name contains 'takeout-' and mimeType='application/zip' and '${folderId}' in parents and trashed=false`
-        : `name contains 'takeout-' and mimeType='application/zip' and trashed=false`
+        ? `name contains 'takeout' and '${folderId}' in parents and trashed=false`
+        : `name contains 'takeout' and trashed=false`
       searchRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(zipQuery)}&fields=files(id,name,mimeType)&orderBy=createdTime desc&pageSize=1`,
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(zipQuery)}&fields=files(id,name,mimeType)&orderBy=createdTime desc`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       )
       if (!searchRes.ok) throw new Error(`Drive ZIP search failed: ${searchRes.status}`)
       searchData = await searchRes.json()
-      file = searchData.files?.[0]
+      // Find the first file that is a zip
+      file = (searchData.files || []).find((f) => 
+        f.mimeType.includes('zip') || f.name.toLowerCase().endsWith('.zip')
+      )
     }
 
     if (!file) {
@@ -354,7 +357,7 @@ async function loadFromGoogleDrive(date) {
 
     // 4. Extract content
     let allActivities = []
-    if (file.mimeType === 'application/zip') {
+    if (file.mimeType.includes('zip') || file.name.toLowerCase().endsWith('.zip')) {
       console.log(`[google-history] Extracting ZIP file in memory...`)
       const arrayBuffer = await downloadRes.arrayBuffer()
       const zip = new AdmZip(Buffer.from(arrayBuffer))
