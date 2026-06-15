@@ -78,6 +78,8 @@ loadEnv(resolve(process.cwd(), 'scripts/brain-worker.env'), { override: true })
 const args = new Set(process.argv.slice(2))
 const limit = readIntArg('--limit', Number(process.env.BRAIN_WORKER_LIMIT ?? 5))
 const rawEntryId = readStringArg('--raw-entry-id', process.env.BRAIN_WORKER_RAW_ENTRY_ID ?? '')
+const sourceOrigin = readStringArg('--source-origin', '')
+const statusFilter = readStringArg('--status', '')
 const watch = args.has('--watch')
 const intervalMs = readIntArg('--interval-ms', Number(process.env.BRAIN_WORKER_INTERVAL_MS ?? 15000))
 
@@ -96,14 +98,18 @@ while (true) {
 }
 
 async function processBatch(batchLimit, onlyRawEntryId) {
+  const statusList = statusFilter
+    ? statusFilter.split(',').map((s) => s.trim()).filter(Boolean)
+    : ['pending', 'failed']
   let query = supabase
     .from('raw_entries')
     .select('*')
     .eq('source_type', 'text')
-    .in('processing_status', ['pending', 'failed'])
+    .in('processing_status', statusList)
     .order('created_at', { ascending: true })
     .limit(batchLimit)
   if (onlyRawEntryId) query = query.eq('id', onlyRawEntryId)
+  if (sourceOrigin) query = query.eq('source_origin', sourceOrigin)
 
   const { data: entries, error } = await query
 
@@ -193,7 +199,7 @@ async function processEntry(entry) {
     await must(
       supabase
         .from('raw_entries')
-        .update({ processed: true, processing_status: 'done', updated_at: now })
+        .update({ processed: true, processing_status: 'done', processed_at: now, updated_at: now })
         .eq('id', entry.id),
     )
     await must(

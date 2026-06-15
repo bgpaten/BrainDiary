@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { Icon, type IconName } from '../Icon'
 import { QuickDiaryInput } from '../QuickDiaryInput'
 
-type RoutineType = 'daily' | 'three-day' | 'weekly'
+type RoutineType = 'daily' | 'daily-google' | 'three-day' | 'weekly'
 type RoutinePhase = 'idle' | 'loading' | 'success' | 'error'
 
 interface RoutineDef {
@@ -14,6 +14,7 @@ interface RoutineDef {
 }
 
 const ROUTINES: RoutineDef[] = [
+  { type: 'daily-google', icon: 'routine-daily', title: 'Run daily routine + Google History', label: 'Harian+G', running: 'Menjalankan routine harian + Google History...' },
   { type: 'daily', icon: 'routine-daily', title: 'Run daily routine', label: 'Harian', running: 'Menjalankan routine harian...' },
   { type: 'three-day', icon: 'routine-three-day', title: 'Run 3-day routine', label: '3 Hari', running: 'Menjalankan routine 3 hari...' },
   { type: 'weekly', icon: 'routine-weekly', title: 'Run weekly routine', label: 'Mingguan', running: 'Menjalankan routine mingguan...' },
@@ -21,6 +22,7 @@ const ROUTINES: RoutineDef[] = [
 
 const ENDPOINT_MAP: Record<RoutineType, string> = {
   daily: '/__brain-routine/run-daily',
+  'daily-google': '/__brain-routine/run-daily-google',
   'three-day': '/__brain-routine/run-three-day',
   weekly: '/__brain-routine/run-weekly',
 }

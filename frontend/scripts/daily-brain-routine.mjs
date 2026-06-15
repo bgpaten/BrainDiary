@@ -78,6 +78,7 @@ const includeReflection = !argv.has('skip-reflection') && readBoolEnv('BRAIN_ROU
 const includeCalibration = !argv.has('skip-calibration') && readBoolEnv('BRAIN_ROUTINE_RUN_CALIBRATION', profileDefaults.calibration)
 const includeReleaseCheck = !argv.has('skip-release-check') && readBoolEnv('BRAIN_ROUTINE_RUN_RELEASE_CHECK', profileDefaults.releaseCheck)
 const includeMemorySnapshot = !argv.has('skip-memory-snapshot') && readBoolEnv('BRAIN_ROUTINE_RUN_MEMORY_SNAPSHOT', profileDefaults.memorySnapshot)
+const includeGoogleHistory = argv.has('include-google-history') || readBoolEnv('BRAIN_ROUTINE_INCLUDE_GOOGLE_HISTORY', false)
 const outputObsidian = readBoolEnv('BRAIN_ROUTINE_OUTPUT_OBSIDIAN', true)
 const evalMinScore = readFloatEnv('BRAIN_ROUTINE_EVAL_MIN_SCORE', 0.7, 0, 1)
 const maxHallucinationRisk = readFloatEnv('BRAIN_ROUTINE_MAX_HALLUCINATION_RISK', 0.3, 0, 1)
@@ -195,6 +196,9 @@ function buildSteps() {
     includeAttachments
       ? step('attachment_import', 'Import Attachments', ['run', 'attachments:import', '--', '--limit', String(limit)])
       : skippedStep('attachment_import', 'Import Attachments', 'skip-attachments'),
+    includeGoogleHistory
+      ? step('google_history_process', 'Process Pending Google History', ['run', 'brain:process:pending-google'])
+      : skippedStep('google_history_process', 'Process Pending Google History', 'skip-google-history'),
     step('brain_worker', 'Process Pending/Failed Raw Entries', ['run', 'brain:worker', '--', '--limit', String(limit)]),
     step('semantic_reindex', 'Reindex Semantic Memory', ['run', 'brain:index', '--', '--limit', String(Math.max(limit, 25))]),
     step('persona_refresh', 'Refresh Persona Profile', ['run', 'brain:persona']),

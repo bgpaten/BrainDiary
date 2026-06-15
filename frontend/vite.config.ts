@@ -55,6 +55,7 @@ function localBrainWorkerPlugin() {
       let entityRuntimeRunning: Promise<{ code: number | null; output: string }> | null = null
       let memoryConsolidationRunning: Promise<{ code: number | null; output: string }> | null = null
       let finalReleaseRunning: Promise<{ code: number | null; output: string }> | null = null
+      let routineDailyGoogleRunning: Promise<{ code: number | null; output: string }> | null = null
 
       server.middlewares.use('/__brain-worker/process', async (req: any, res: any) => {
         if (req.method !== 'POST') {
@@ -1315,6 +1316,13 @@ function localBrainWorkerPlugin() {
           getLock: () => routineWeeklyRunning,
           setLock: (value) => { routineWeeklyRunning = value },
         },
+        {
+          url: '/__brain-routine/run-daily-google',
+          script: 'brain:routine:daily:google',
+          label: 'Routine harian + Google History',
+          getLock: () => routineDailyGoogleRunning,
+          setLock: (value) => { routineDailyGoogleRunning = value },
+        },
       ]
 
       for (const endpoint of routineProfileEndpoints) {
@@ -1480,6 +1488,35 @@ function localBrainWorkerPlugin() {
         qualityRunning = null
         return result
       }
+
+      // --- Google History pending status endpoint ---
+      server.middlewares.use('/__google-history/pending', async (req: any, res: any) => {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Method not allowed' })
+          return
+        }
+        try {
+          const result = await runLocalWorker(['run', 'google:history:audit'])
+          const parsed = result.code === 0 ? parseOutput(result.output) : { ok: false, error: result.output }
+          const data = typeof parsed === 'object' && parsed ? parsed as Record<string, any> : {}
+          sendJson(res, result.code === 0 ? 200 : 500, {
+            pending_count: data?.raw_entries?.pending ?? 0,
+            latest_collected_date: data?.latest_collected_date ?? null,
+            latest_processed_date: data?.latest_processed_date ?? null,
+            failed_count: data?.raw_entries?.failed ?? 0,
+            done_count: data?.raw_entries?.done ?? 0,
+          })
+        } catch (err) {
+          sendJson(res, 500, {
+            pending_count: 0,
+            latest_collected_date: null,
+            latest_processed_date: null,
+            failed_count: 0,
+            done_count: 0,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      })
     },
   }
 }

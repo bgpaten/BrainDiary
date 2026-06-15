@@ -1657,6 +1657,44 @@ summary {
   background: var(--color-accent-green-soft);
 }
 
+/* --- Google History Queue Status Card --- */
+.routine-google-history-card {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-xl);
+  border-left: 3px solid var(--color-accent-blue);
+}
+
+.routine-google-history-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.routine-google-history-card__header h3 {
+  margin: 0;
+  font-size: var(--font-body);
+}
+
+.routine-google-history-card__hint {
+  margin: 0;
+  color: var(--color-accent-blue);
+  font-size: var(--font-caption-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-hairline);
+}
+
+.routine-google-history-card__hint code {
+  color: var(--color-accent-blue);
+  background: var(--color-surface-card);
+}
+
 code {
   display: inline-block;
   max-width: 100%;

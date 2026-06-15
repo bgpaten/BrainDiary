@@ -112,7 +112,12 @@
     "obsidian:sync": "node scripts/obsidian-sync.mjs",
     "obsidian:sync:watch": "node scripts/obsidian-sync.mjs --watch",
     "attachments:import": "node scripts/attachment-importer.mjs",
-    "attachments:import:watch": "node scripts/attachment-importer.mjs --watch"
+    "attachments:import:watch": "node scripts/attachment-importer.mjs --watch",
+    "google:history:collect": "node scripts/google-history-importer.mjs --mode collect",
+    "google:history:collect:date": "node scripts/google-history-importer.mjs --mode collect --date",
+    "google:history:audit": "node scripts/google-history-importer.mjs --audit",
+    "brain:process:pending-google": "node scripts/brain-worker.mjs --source-origin google_history --status pending",
+    "brain:routine:daily:google": "node scripts/daily-brain-routine.mjs --type daily --profile daily --include-google-history"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

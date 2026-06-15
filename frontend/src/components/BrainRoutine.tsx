@@ -8,6 +8,15 @@ interface BrainRoutineProps {
 
 type BusyState = 'routine' | 'health' | null
 
+interface GoogleHistoryStatus {
+  pending_count: number
+  latest_collected_date: string | null
+  latest_processed_date: string | null
+  failed_count: number
+  done_count: number
+  error?: string
+}
+
 export function BrainRoutine({ onNotify }: BrainRoutineProps) {
   const [runs, setRuns] = useState<BrainRoutineRun[]>([])
   const [health, setHealth] = useState<BrainHealthCheckResult | null>(null)
@@ -18,6 +27,8 @@ export function BrainRoutine({ onNotify }: BrainRoutineProps) {
   const [includeEvaluation, setIncludeEvaluation] = useState(true)
   const [includeSync, setIncludeSync] = useState(true)
   const [dryRun, setDryRun] = useState(false)
+  const [googleHistoryStatus, setGoogleHistoryStatus] = useState<GoogleHistoryStatus | null>(null)
+  const [ghLoading, setGhLoading] = useState(false)
 
   const latest = runs[0] ?? null
   const metrics = useMemo(() => latest?.metrics ?? {}, [latest])
@@ -44,7 +55,23 @@ export function BrainRoutine({ onNotify }: BrainRoutineProps) {
 
   useEffect(() => {
     void refresh()
+    void fetchGoogleHistoryStatus()
   }, [refresh])
+
+  const fetchGoogleHistoryStatus = async () => {
+    setGhLoading(true)
+    try {
+      const res = await fetch('/__google-history/pending')
+      if (res.ok) {
+        const data = await res.json()
+        setGoogleHistoryStatus(data as GoogleHistoryStatus)
+      }
+    } catch {
+      // Silently fail — endpoint may not be available
+    } finally {
+      setGhLoading(false)
+    }
+  }
 
   const runRoutine = async () => {
     if (busy) return
@@ -130,6 +157,50 @@ export function BrainRoutine({ onNotify }: BrainRoutineProps) {
       </div>
 
       {error && <div className="evaluation-alert">{error}</div>}
+
+      {/* Google History Pending Queue Status */}
+      {googleHistoryStatus && (
+        <div className="routine-google-history-card">
+          <div className="routine-google-history-card__header">
+            <h3>📊 Google History Queue</h3>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void fetchGoogleHistoryStatus()}
+              disabled={ghLoading}
+            >
+              {ghLoading ? '...' : '↻'}
+            </button>
+          </div>
+          <div className="routine-summary">
+            <MetricCard
+              label="Pending"
+              value={googleHistoryStatus.pending_count}
+            />
+            <MetricCard
+              label="Failed"
+              value={googleHistoryStatus.failed_count}
+            />
+            <MetricCard
+              label="Done"
+              value={googleHistoryStatus.done_count}
+            />
+            <MetricCard
+              label="Latest Collected"
+              value={googleHistoryStatus.latest_collected_date ?? '-'}
+            />
+            <MetricCard
+              label="Latest Processed"
+              value={googleHistoryStatus.latest_processed_date ?? '-'}
+            />
+          </div>
+          {googleHistoryStatus.pending_count > 0 && (
+            <p className="routine-google-history-card__hint">
+              Ada {googleHistoryStatus.pending_count} entry pending. Jalankan <code>Harian+G</code> dari dock atau <code>npm run brain:routine:daily:google</code>.
+            </p>
+          )}
+        </div>
+      )}
 
       {health && (
         <div className={`routine-health routine-health--${health.status}`}>
