@@ -3,36 +3,48 @@ import type { BrainCluster, BrainEdge, BrainNode, NodeType } from '../types/brai
 import { getReviewStatus } from './brainQuality'
 
 // ---------------------------------------------------------------------------
-// Palet warna untuk color_key cluster (lihat brain_clusters.color_key).
+// Palet warna semantik (ala graph Obsidian) di atas canvas near-black.
+// Tiap kategori punya satu warna tetap:
+//   Default / diary      → #5f4b1f
+//   Ahyar / identity     → #2f3a63
+//   People               → #5a2b3f
+//   Project / Brain OS   → #1f4f5a
+//   Goal                 → #24513f
+//   Problem              → #5a2525
+//   Decision             → #43275f
+//   Skill / teknologi    → #21445f
 // ---------------------------------------------------------------------------
+
+// Palet untuk color_key cluster (lihat brain_clusters.color_key).
 const COLOR_KEY_PALETTE: Record<string, string> = {
-  indigo: '#3730a3',
-  emerald: '#047857',
-  amber: '#92400e',
-  rose: '#9f1239',
-  sky: '#075985',
-  violet: '#5b21b6',
-  teal: '#0f766e',
-  orange: '#9a3412',
+  indigo: '#2f3a63', // identity
+  rose: '#5a2b3f', // people
+  teal: '#1f4f5a', // project
+  emerald: '#24513f', // goal
+  orange: '#5a2525', // problem
+  violet: '#43275f', // decision
+  sky: '#21445f', // skill/teknologi
+  amber: '#5f4b1f', // default/diary
 }
 
-// Warna fallback berdasarkan type node bila cluster tidak punya warna.
+// Warna berdasarkan type node bila cluster tidak punya warna.
 const TYPE_COLOR: Record<NodeType, string> = {
-  person: '#1d4ed8',
-  project: '#6d28d9',
-  tool: '#047857',
-  topic: '#0e7490',
-  pattern: '#be123c',
-  goal: '#854d0e',
-  organization: '#9d174d',
-  place: '#166534',
-  event: '#a16207',
-  decision: '#7e22ce',
-  emotion: '#9f1239',
-  document: '#334155',
+  person: '#5a2b3f', // People
+  organization: '#5a2b3f', // People (kelompok)
+  project: '#1f4f5a', // Project / Brain OS
+  goal: '#24513f', // Goal
+  decision: '#43275f', // Decision
+  tool: '#21445f', // Skill / teknologi
+  topic: '#2f3a63', // Ahyar / identity
+  pattern: '#5a2525', // Problem
+  emotion: '#5a2525', // Problem
+  document: '#5f4b1f', // Default / diary
+  event: '#5f4b1f', // Default / diary
+  place: '#5f4b1f', // Default / diary
 }
 
-const DEFAULT_COLOR = '#1e293b'
+// Default / diary — warna fallback bila type & cluster tak dikenal.
+const DEFAULT_COLOR = '#5f4b1f'
 
 // ---------------------------------------------------------------------------
 // Helper skala

@@ -8,7 +8,8 @@ interface QuickDiaryInputProps {
   // user login Supabase; null bila belum login.
   userId: string | null
   // dipanggil setelah Brain Engine selesai agar App me-refresh graph.
-  onAfterProcess?: () => void
+  // Mengembalikan Promise agar kita bisa menunggu graph selesai dimuat.
+  onAfterProcess?: () => void | Promise<void>
   onNotify?: (kind: 'success' | 'error' | 'info', message: string) => void
 }
 
@@ -76,19 +77,16 @@ export function QuickDiaryInput({ userId, onAfterProcess, onNotify }: QuickDiary
     const result = await processEntry(inserted.id as string)
 
     if (result.status === 'done') {
-      setStatus({
-        kind: 'success',
-        message: typeof result.nodes === 'number' || typeof result.edges === 'number'
-          ? `Brain berhasil diperbarui - ${result.nodes ?? 0} node, ${result.edges ?? 0} relasi.`
-          : (result.message ?? 'Brain berhasil diperbarui.'),
-      })
-      onNotify?.(
-        'success',
+      const summary =
         typeof result.nodes === 'number' || typeof result.edges === 'number'
           ? `Brain berhasil diperbarui - ${result.nodes ?? 0} node, ${result.edges ?? 0} relasi.`
-          : (result.message ?? 'Brain berhasil diperbarui.'),
-      )
-      onAfterProcess?.()
+          : (result.message ?? 'Brain berhasil diperbarui.')
+      setStatus({ kind: 'success', message: summary })
+      onNotify?.('success', summary)
+      // Tunggu graph selesai dimuat ulang, lalu beri tahu user bahwa
+      // datanya sudah tampil di graph view.
+      await onAfterProcess?.()
+      onNotify?.('success', 'Diary tersimpan & sudah tampil di graph view.')
     } else {
       const message = `Gagal memproses brain: ${result.error ?? result.message ?? 'tidak diketahui'}. Diary mentah tetap tersimpan.`
       setStatus({ kind: 'error', message })

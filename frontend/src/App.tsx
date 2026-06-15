@@ -56,7 +56,7 @@ type DataState =
   | { status: 'error'; message: string }
   | { status: 'ready'; data: BrainData }
 
-type ToastState = { id: number; kind: 'success' | 'error' | 'info'; message: string } | null
+type ToastItem = { id: number; kind: 'success' | 'error' | 'info'; message: string }
 type ViewMode = 'graph' | 'review' | 'chat' | 'timeline' | 'digest' | 'evaluation' | 'routine' | 'backup' | 'calibration' | 'similarity' | 'drift' | 'reflection' | 'chat-samples' | 'conflicts' | 'self-clone-eval' | 'runtime' | 'long-term-memory' | 'final-release'
 type QualityBusy = 'merge' | 'delete-node' | 'delete-edge' | 'update-node' | 'update-edge' | 'retry' | null
 
@@ -111,14 +111,17 @@ export default function App() {
   const [indexBusy, setIndexBusy] = useState(false)
   const [qualityBusy, setQualityBusy] = useState<QualityBusy>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [toast, setToast] = useState<ToastState>(null)
+  const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const notify = useCallback((kind: 'success' | 'error' | 'info', message: string) => {
-    const next = { id: Date.now(), kind, message }
-    setToast(next)
-    window.setTimeout(() => {
-      setToast((current) => (current?.id === next.id ? null : current))
-    }, 4200)
+    // Tiap notifikasi ditumpuk; tetap tampil sampai user menutupnya sendiri
+    // (tombol x). Tidak ada auto-hide.
+    const next = { id: Date.now() + Math.floor(Math.random() * 1000), kind, message }
+    setToasts((current) => [...current, next])
+  }, [])
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((current) => current.filter((t) => t.id !== id))
   }, [])
 
   // --- Auth bootstrap -------------------------------------------------------
@@ -829,12 +832,23 @@ export default function App() {
         {/* Floating bottom dock: 3 routine buttons + diary input only */}
         <BottomCommandDock
           userId={session?.user.id ?? null}
-          onAfterProcess={() => void fetchData()}
+          onAfterProcess={() => fetchData()}
           onNotify={notify}
           showLabels={expanded}
         />
 
-        {toast && <Toast kind={toast.kind} message={toast.message} onClose={() => setToast(null)} />}
+        {toasts.length > 0 && (
+          <div className="toast-stack">
+            {toasts.map((t) => (
+              <Toast
+                key={t.id}
+                kind={t.kind}
+                message={t.message}
+                onClose={() => dismissToast(t.id)}
+              />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   )

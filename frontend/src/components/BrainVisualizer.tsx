@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import CytoscapeComponent from 'react-cytoscapejs'
-import type { Core, ElementDefinition, NodeSingular } from 'cytoscape'
+import type { Core, ElementDefinition } from 'cytoscape'
 
 interface BrainVisualizerProps {
   elements: ElementDefinition[]
@@ -16,7 +16,7 @@ interface BrainVisualizerProps {
 // - opacity = data(opacity)   (confidence rendah → redup)
 // - lebar edge = data(width)  (dari weight)
 // - label node = name, label edge = relation_type
-// - semua node berbentuk circle; warna gelap membedakan type/cluster
+// - node berbentuk lingkaran kecil ala graph view Obsidian; warna membedakan type/cluster
 const stylesheet = [
   {
     selector: 'node',
@@ -35,7 +35,7 @@ const stylesheet = [
       'text-halign': 'center',
       'text-margin-y': 4,
       'text-outline-width': 2,
-      'text-outline-color': '#050813',
+      'text-outline-color': '#0a0a0b',
       'min-zoomed-font-size': 8,
       // transisi halus untuk perubahan visual (mis. saat hover/seleksi).
       'transition-property': 'background-color, border-color, width, height',
@@ -75,7 +75,7 @@ const stylesheet = [
       'font-size': 8,
       color: '#8b97aa',
       'text-rotation': 'autorotate',
-      'text-background-color': '#050813',
+      'text-background-color': '#0a0a0b',
       'text-background-opacity': 0.7,
       'text-background-padding': 2,
       'min-zoomed-font-size': 7,
@@ -98,33 +98,37 @@ const stylesheet = [
   },
 ]
 
-// Layout konsentris → node tersusun melingkar (mirip graph Obsidian),
-// bukan acak. Node berderajat tinggi (banyak relasi) ditarik ke pusat,
-// node pinggiran membentuk cincin luar sehingga keseluruhan tampak bulat.
+// Layout force-directed (cose) → node menyebar organik & saling tarik-menarik
+// berdasar relasi, membentuk kluster alami persis seperti graph view Obsidian.
+// Tidak ada cincin/lingkaran paksa: posisi ditentukan simulasi gaya pegas.
 const layout = {
-  name: 'concentric',
+  name: 'cose',
   animate: true,
   animationDuration: 900,
   animationEasing: 'ease-in-out-cubic' as const,
-  // level cincin ditentukan oleh derajat node (jumlah relasi).
-  concentric: (node: NodeSingular) => node.degree(false),
-  // jarak antar cincin proporsional terhadap selisih derajat.
-  levelWidth: () => 1,
-  minNodeSpacing: 42,
-  spacingFactor: 1.15,
+  // randomize awal supaya tiap run menyebar, lalu disettle oleh gaya.
+  randomize: true,
+  // gaya tolak antar-node (semakin besar → node makin merenggang).
+  nodeRepulsion: () => 12000,
+  // panjang ideal pegas (edge); jarak target antar node yang terhubung.
+  idealEdgeLength: () => 120,
+  // tarikan pegas pada edge.
+  edgeElasticity: () => 120,
+  // gravitasi lembut menjaga komponen lepas tidak terbang jauh.
+  gravity: 0.4,
+  // hindari node bertumpuk.
+  nodeOverlap: 16,
+  componentSpacing: 90,
+  numIter: 1200,
+  coolingFactor: 0.95,
+  initialTemp: 220,
   padding: 40,
-  equidistant: false,
-  startAngle: (3 / 2) * Math.PI,
 }
 
 // Parameter animasi drift "mengambang" yang lambat & organik.
 // Amplitudo dibuat cukup besar agar tetap terlihat meski graph di-zoom-to-fit.
-const DRIFT_RADIUS = 18 // amplitudo gerak (px, koordinat model) di sekitar posisi dasar
+const DRIFT_RADIUS = 14 // amplitudo gerak (px, koordinat model) di sekitar posisi dasar
 const DRIFT_SPEED = 0.0011 // kecepatan sudut; ~1 putaran penuh per ~6 detik (slow tapi terlihat)
-
-// Rotasi global: seluruh layout bulat ikut berputar pelan mengelilingi pusatnya
-// (bukan tiap node sendiri-sendiri). rad/ms; ~1 putaran penuh per ~120 detik.
-const ROTATE_SPEED = 0.000052
 
 export function BrainVisualizer({
   elements,
@@ -134,44 +138,23 @@ export function BrainVisualizer({
 }: BrainVisualizerProps) {
   const cyRef = useRef<Core | null>(null)
   const rafRef = useRef<number | null>(null)
-  // Posisi dasar tiap node disimpan dalam koordinat KUTUB relatif terhadap
-  // pusat layout (radius + sudut), supaya seluruh layout bisa diputar pelan.
+  // Posisi dasar tiap node disimpan sebagai koordinat absolut (x, y) hasil
+  // layout force-directed, plus fase & frekuensi acak untuk drift mengambang.
   const basePosRef = useRef<
-    Map<string, { radius: number; angle: number; phase: number; freq: number }>
+    Map<string, { x: number; y: number; phase: number; freq: number }>
   >(new Map())
-  // pusat (centroid) layout — sumbu rotasi global.
-  const centerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
-  // sudut rotasi global terkini (dipakai saat node dilepas dari drag).
-  const spinRef = useRef<number>(0)
   // node yang sedang di-drag tidak boleh di-drift agar tidak "melawan" kursor.
   const draggingRef = useRef<Set<string>>(new Set())
 
-  // Rekam posisi dasar tiap node setelah layout selesai (sebagai kutub).
+  // Rekam posisi dasar tiap node setelah layout selesai.
   const captureBasePositions = (cy: Core) => {
     const map = basePosRef.current
     map.clear()
-
-    // hitung centroid dari seluruh node sebagai pusat rotasi.
-    const nodes = cy.nodes()
-    let cx = 0
-    let cy0 = 0
-    nodes.forEach((n) => {
+    cy.nodes().forEach((n) => {
       const p = n.position()
-      cx += p.x
-      cy0 += p.y
-    })
-    const count = nodes.length || 1
-    cx /= count
-    cy0 /= count
-    centerRef.current = { x: cx, y: cy0 }
-
-    nodes.forEach((n) => {
-      const p = n.position()
-      const dx = p.x - cx
-      const dy = p.y - cy0
       map.set(n.id(), {
-        radius: Math.hypot(dx, dy),
-        angle: Math.atan2(dy, dx),
+        x: p.x,
+        y: p.y,
         // fase & frekuensi acak → tiap node mengambang beda ritme.
         phase: Math.random() * Math.PI * 2,
         freq: 0.6 + Math.random() * 0.8,
@@ -179,32 +162,25 @@ export function BrainVisualizer({
     })
   }
 
-  // Loop animasi: geser tiap node sedikit di sekeliling posisi dasarnya.
+  // Loop animasi: geser tiap node sedikit di sekeliling posisi dasarnya
+  // (drift Lissajous lembut), tanpa rotasi global — layout tetap organik.
   const startDrift = (cy: Core) => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
 
     const tick = (t: number) => {
       const map = basePosRef.current
       const dragging = draggingRef.current
-      const center = centerRef.current
-      // sudut rotasi global: seluruh layout berputar pelan sebagai satu kesatuan.
-      const spin = t * ROTATE_SPEED
-      spinRef.current = spin
       cy.batch(() => {
         cy.nodes().forEach((n) => {
           const id = n.id()
           if (dragging.has(id)) return
           const base = map.get(id)
           if (!base) return
-          // 1) posisi dasar = titik kutub diputar mengelilingi pusat layout.
-          const ang = base.angle + spin
-          const bx = center.x + Math.cos(ang) * base.radius
-          const by = center.y + Math.sin(ang) * base.radius
-          // 2) tambah drift "mengambang" lembut (Lissajous) di sekitar titik itu.
+          // drift "mengambang" lembut (Lissajous) di sekitar posisi dasar.
           const a = t * DRIFT_SPEED * base.freq + base.phase
           n.position({
-            x: bx + Math.cos(a) * DRIFT_RADIUS,
-            y: by + Math.sin(a * 0.9) * DRIFT_RADIUS,
+            x: base.x + Math.cos(a) * DRIFT_RADIUS,
+            y: base.y + Math.sin(a * 0.9) * DRIFT_RADIUS,
           })
         })
       })
@@ -235,14 +211,10 @@ export function BrainVisualizer({
       const n = evt.target
       const base = basePosRef.current.get(n.id())
       if (base) {
-        // konversi posisi lepas kembali ke kutub (radius + sudut), lalu
-        // kurangi spin terkini agar node tidak "melompat" saat drift lanjut.
+        // adopsi posisi lepas sebagai posisi dasar drift yang baru.
         const p = n.position()
-        const center = centerRef.current
-        const dx = p.x - center.x
-        const dy = p.y - center.y
-        base.radius = Math.hypot(dx, dy)
-        base.angle = Math.atan2(dy, dx) - spinRef.current
+        base.x = p.x
+        base.y = p.y
       }
       draggingRef.current.delete(n.id())
     })
